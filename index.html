@@ -8,6 +8,7 @@ body{font-family:Arial,sans-serif;margin:0;padding:12px;background:var(--bg);col
 .bar{display:flex;gap:8px;margin-bottom:6px}
 input{flex:1;min-width:0;padding:10px;font-size:16px;border:1px solid var(--bd);border-radius:6px;background:var(--card);color:var(--txt)}
 button{padding:10px 16px;font-size:16px;border:0;border-radius:6px;background:#1a73e8;color:#fff}
+button.off{background:#888}
 small{color:var(--mut)}
 .box{background:var(--card);border-radius:8px;padding:8px;margin-bottom:12px;overflow:auto}
 #top{box-sizing:border-box}
@@ -30,39 +31,66 @@ tr.s{cursor:pointer}tr.s:hover{background:var(--hov)}
   <input id="q" placeholder="Search APL..." oninput="hide=false;draw()">
   <button onclick="load()">Refresh</button>
 </div>
+<div class="bar">
+  <button id="bs" onclick="setMode('s')">Summary</button>
+  <button id="bp" onclick="setMode('p')">Production</button>
+  <button id="bd" onclick="setMode('d')">Dispatch</button>
+</div>
+<div class="bar">
+  <button id="so" onclick="asc=!asc;draw()"></button>
+  <input type="date" id="dt" onchange="draw()">
+  <button class="x" onclick="$('dt').value='';draw()">Clear</button>
+</div>
 <small id="upd"></small>
 <div class="box" id="top"><div id="sum"></div></div>
 <div id="det"></div>
 
 <script>
-let D = {stock:[],prod:[],disp:[]}, sel = null, hide = false;
+const EXEC = 'PASTE_YOUR_EXEC_URL_HERE';
+let D = {stock:[],prod:[],disp:[]}, sel = null, hide = false, mode = 's', asc = false;
 const $ = id => document.getElementById(id);
 const fit = () => { const t = $('top'), r = innerHeight - t.offsetTop - 24; t.style.height = (t.classList.contains('sm') ? r * .4 : r) + 'px'; };
 onresize = fit;
 const tbl = (h, rows) => `<table><tr>${h.map(([t,c]) => `<th class="${c}">${t}</th>`).join('')}</tr>${rows.join('')}</table>`;
+const ts = s => { const [a,b,c] = String(s).split('-'); return +new Date(2000 + +c, 'JanFebMarAprMayJunJulAugSepOctNovDec'.indexOf(b) / 3, +a); };
+const rowsOf = (arr, apl, q = '') => arr
+  .filter(r => (!apl || r[1] === apl) && r[1].toLowerCase().includes(q) && (!$('dt').value || ts(r[0]) === +new Date($('dt').value + 'T00:00')))
+  .sort((a, b) => (ts(a[0]) - ts(b[0])) * (asc ? 1 : -1));
+const tr = r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td class="n">${r[2]}</td></tr>`;
+const get = () => window.google && google.script && google.script.run
+  ? new Promise((ok, no) => google.script.run.withSuccessHandler(ok).withFailureHandler(no).getData())
+  : fetch(EXEC + '?data=1').then(r => r.json());
 
 function load() {
   $('upd').textContent = 'Updating...';
-  fetch('https://script.google.com/macros/s/AKfycbzJpKMMgl3n2NS5UH-LHz6h0QBT75X4lgEdX-jSG4_Xj1uYmBGppylNJdarlWsdM_8/exec?data=1')
-    .then(r => r.json())
-    .then(d => { D = d; draw(); $('upd').textContent = 'Last updated: ' + new Date().toLocaleTimeString(); })
-    .catch(e => $('upd').textContent = 'Error: ' + e.message);
+  get().then(d => { D = d; draw(); $('upd').textContent = 'Last updated: ' + new Date().toLocaleTimeString(); })
+       .catch(e => $('upd').textContent = 'Error: ' + e.message);
 }
 
+function setMode(m) { mode = m; hide = false; draw(); }
 function pick(a) { hide = false; sel = sel === a ? null : a; draw(); }
 
 function draw() {
   const q = $('q').value.trim().toLowerCase();
+  ['s','p','d'].forEach(m => $('b' + m).className = m === mode ? '' : 'off');
+  $('so').textContent = asc ? 'Old → New' : 'New → Old';
+  $('top').style.display = mode === 's' ? '' : 'none';
+
+  if (mode !== 's') {
+    const k = mode === 'p' ? 'p' : 'd', rows = rowsOf(D[mode === 'p' ? 'prod' : 'disp'], null, q);
+    $('det').innerHTML = `<div class="box"><h4>All ${mode === 'p' ? 'Production' : 'Dispatch'} (${rows.length} entries, total ${rows.reduce((s, r) => s + r[2], 0)})</h4>${tbl([['Date', k], ['APL', 'a'], ['Qty', 'n ' + k]], rows.map(tr))}</div>`;
+    return;
+  }
+
   const list = D.stock.filter(s => s.apl.toLowerCase().includes(q));
   const one = hide ? null : (sel && list.find(s => s.apl === sel) ? sel : (list.length === 1 ? list[0].apl : null));
   const rows = list.map(s => `<tr class="s" onclick="pick('${s.apl.replace(/'/g,"\\'")}')"><td>${s.apl}</td><td class="n">${s.prod}</td><td class="n">${s.disp}</td><td class="n"><b>${s.prod - s.disp}</b></td></tr>`);
   $('sum').innerHTML = tbl([['APL','a'],['Production','n p'],['Dispatch','n d'],['Balance','n b']], rows);
   $('top').classList.toggle('sm', !!one);
   fit();
-  const h = arr => arr.filter(r => r[1] === one).map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td class="n">${r[2]}</td></tr>`);
   $('det').innerHTML = one ? `<div class="hh"><h3>${one}</h3><button class="x" onclick="sel=null;hide=true;draw()">&times; Close</button></div><div class="hist">
-    <div class="box"><h4>Production History</h4>${tbl([['Date','p'],['APL','a'],['Qty','n p']], h(D.prod))}</div>
-    <div class="box"><h4>Dispatch History</h4>${tbl([['Date','d'],['APL','a'],['Qty','n d']], h(D.disp))}</div></div>` : '';
+    <div class="box"><h4>Production History</h4>${tbl([['Date','p'],['APL','a'],['Qty','n p']], rowsOf(D.prod, one).map(tr))}</div>
+    <div class="box"><h4>Dispatch History</h4>${tbl([['Date','d'],['APL','a'],['Qty','n d']], rowsOf(D.disp, one).map(tr))}</div></div>` : '';
 }
 
 fit(); load(); setInterval(load, 60000);
