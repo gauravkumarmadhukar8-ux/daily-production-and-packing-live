@@ -46,7 +46,7 @@ tr.s{cursor:pointer}tr.s:hover{background:var(--hov)}
 <div id="det"></div>
 
 <script>
-const EXEC = 'PASTE_YOUR_EXEC_URL_HERE';
+const EXEC = 'https://script.google.com/macros/s/AKfycbzckFlSCmeredDxKS5SC2o04EeGXOqzSAanvMZ7D8yJ1svhKYKiXhJNOgZs0Fd_VpRz/exec';
 let D = {stock:[],prod:[],disp:[]}, sel = null, hide = false, mode = 's', asc = false;
 const $ = id => document.getElementById(id);
 const fit = () => { const t = $('top'), r = innerHeight - t.offsetTop - 24; t.style.height = (t.classList.contains('sm') ? r * .4 : r) + 'px'; };
