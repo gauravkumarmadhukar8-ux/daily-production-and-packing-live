@@ -57,14 +57,12 @@ const rowsOf = (arr, apl, q = '') => arr
   .filter(r => (!apl || r[1] === apl) && r[1].toLowerCase().includes(q) && (!$('dt').value || ts(r[0]) === +new Date($('dt').value + 'T00:00')))
   .sort((a, b) => (ts(a[0]) - ts(b[0])) * (asc ? 1 : -1));
 const tr = r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td class="n">${r[2]}</td></tr>`;
-const get = () => window.google && google.script && google.script.run
-  ? new Promise((ok, no) => google.script.run.withSuccessHandler(ok).withFailureHandler(no).getData())
-  : fetch(EXEC + '?data=1').then(r => r.json());
 
 function load() {
   $('upd').textContent = 'Updating...';
-  get().then(d => { D = d; draw(); $('upd').textContent = 'Last updated: ' + new Date().toLocaleTimeString(); })
-       .catch(e => $('upd').textContent = 'Error: ' + e.message);
+  fetch(EXEC + '?data=1').then(r => r.json())
+    .then(d => { D = d; draw(); $('upd').textContent = 'Last updated: ' + new Date().toLocaleTimeString(); })
+    .catch(e => $('upd').textContent = 'Error: ' + e.message);
 }
 
 function setMode(m) { mode = m; hide = false; draw(); }
